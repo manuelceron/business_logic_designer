@@ -1,0 +1,161 @@
+modules:
+  - name: Students
+    db_table_name: students
+    fields:
+      - db_field_name: student_id
+        db_data_type: integer
+        db_primary_key: true
+        db_auto_increment: true
+        db_comment: "unique student ID"
+        form_aria_label: "Student ID"
+        form_attributes:
+          - name: class
+            value: "input-field"
+          - name: data-custom-attribute
+            value: "Custom Value"
+          - name: id
+            value: "student-id"
+          - name: placeholder
+            value: "Enter Student ID"
+        form_input_type: number
+        form_is_range: true
+        form_label: Student ID
+        form_orderable: true
+        form_search: true
+        form_visible_on_view: true
+        required: true
+        long: 11
+
+      - db_comment: "Student name"
+        db_data_type: varchar
+        db_field_name: name
+        db_auto_increment: false
+        form_aria_label: "Name"
+        form_attributes:
+          - name: class
+            value: "input-field"
+          - name: data-custom-attribute
+            value: "Custom Value"
+          - name: id
+            value: "name"
+          - name: placeholder
+            value: "Enter Name"
+        form_input_type: text
+        form_is_range: false
+        form_label: Name
+        form_orderable: true
+        form_search: true
+        form_visible_on_view: true
+        required: true
+        long: 255
+
+      - db_comment: "Student Age"
+        db_data_type: integer
+        db_field_name: age
+        db_auto_increment: false
+        form_aria_label: "Age"
+        form_attributes:
+          - name: class
+            value: "input-field"
+          - name: data-custom-attribute
+            value: "Custom Value"
+          - name: id
+            value: "age"
+          - name: placeholder
+            value: "Enter Age"
+        form_input_type: number
+        form_is_range: false
+        form_label: Age
+        form_orderable: true
+        form_search: false
+        form_visible_on_view: true
+        required: false
+        long: 11
+
+    indexes:
+      - table: Students
+        fields: [name]
+        index_type: INDEX  # Tipo de índice
+
+  - name: Courses
+    db_table_name: courses
+    fields:
+      - db_auto_increment: true
+        db_comment: "Unique course ID"
+        db_data_type: integer
+        db_field_name: course_id
+        db_primary_key: true
+        form_aria_label: "Course ID"
+        form_attributes:
+          - name: class
+            value: "input-field"
+          - name: data-custom-attribute
+            value: "Custom Value"
+          - name: id
+            value: "course-id"
+          - name: placeholder
+            value: "Enter Course ID"
+        form_input_type: number
+        form_is_range: true
+        form_label: Course ID
+        form_orderable: true
+        form_search: true
+        form_visible_on_view: true
+        required: true
+        long: 11
+
+      - db_comment: "Course name"
+        db_data_type: text
+        db_field_name: course_name
+        db_auto_increment: false
+        form_aria_label: "Course Name"
+        form_attributes:
+          - name: class
+            value: "input-field"
+          - name: data-custom-attribute
+            value: "Custom Value"
+          - name: id
+            value: "course-name"
+          - name: placeholder
+            value: "Enter Course Name"
+        form_input_type: text
+        form_is_range: false
+        form_label: Course Name
+        form_orderable: true
+        form_search: true
+        form_visible_on_view: true
+        required: true
+        long: 11
+
+      - db_comment: "Instructor ID"
+        db_data_type: integer
+        db_field_name: instructor_id
+        db_auto_increment: false
+        form_aria_label: "Instructor ID"
+        form_attributes:
+          - name: class
+            value: "input-field"
+          - name: data-custom-attribute
+            value: "Custom Value"
+          - name: id
+            value: "instructor-id"
+          - name: placeholder
+            value: "Enter Instructor ID"
+        form_input_type: number
+        form_is_range: true
+        form_label: Instructor ID
+        form_orderable: true
+        form_search: true
+        form_visible_on_view: true
+        required: false
+
+    indexes:
+      - table: Courses
+        fields: [instructor_id]
+        index_type: INDEX  # UNIQUE | PRIMARY KEY
+
+foreign_keys:
+  - source_table: courses
+    source_field: instructor_id
+    target_table: instructors
+    target_field: instructor_id
