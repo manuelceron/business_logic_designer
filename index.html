@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  <title>BLM Bussiness Logic Model Designer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #sidebar {
+      width: 250px;
+      background: #f4f4f4;
+      padding: 1rem;
+      border-right: 2px solid #ccc;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #fields, #modules {
+      margin-top: 1rem;
+    }
+
+    .draggable {
+      background: #e2e8f0;
+      padding: 0.5rem;
+      margin: 0.3rem 0;
+      cursor: grab;
+      border-radius: 4px;
+    }
+
+    .droppable {
+      flex: 1;
+      border: 2px dashed #aaa;
+      margin: 1rem;
+      padding: 1rem;
+      min-height: 300px;
+      overflow-y: auto;
+    }
+
+    .module {
+      background: #edf2f7;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      border-radius: 6px;
+      box-shadow: 0 0 3px #aaa;
+    }
+    
+    .module h4 {
+      margin: 0 0 0.5rem;
+    }
+
+    .field {
+      margin-left: 1rem;
+    }
+
+    #output {
+      padding: 1rem;
+      background: #222;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 0.85rem;
+      overflow-y: auto;
+      max-height: 200px;
+    }
+
+    button {
+      padding: 0.5rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    #modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+
+    #modal-content {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      max-width: 500px;
+    }
+
+    #modal-content h2 {
+      margin-top: 0;
+    }
+
+    #modal-content code {
+      display: block;
+      background: #eee;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      white-space: pre-wrap;
+    }
+
+    #topbar {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .indexes {
+    margin-top: 10px;
+    padding-left: 1rem;
+    border-left: 2px dashed #ccc;
+    }
+    .indexes h5 {
+    margin: 0 0 0.5rem;
+    }
+    .indexes select[multiple] {
+    height: auto;
+    }
+/*menu*/
+#menubar {
+  background: #333;
+  color: white;
+  padding: 0.5rem;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#menubar ul {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+  margin: 0;
+}
+
+#menubar li {
+  display: flex;
+  align-items: center;
+}
+
+#menubar button {
+  background: #444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+#menubar button:hover {
+  background: #555;
+}
+
+#menubar input[type="file"] {
+  color: white;
+  cursor: pointer;
+}
+
+  </style>
+</head>
+<body>
+    <script> 
+    const typeDefaults = [
+    { type: "varchar", label: "Texto", defaultLength: 255 },
+    { type: "int", label: "Número entero", defaultLength: 11 },
+    { type: "bigint", label: "Número grande", defaultLength: 20 },
+    { type: "boolean", label: "Booleano", defaultLength: null },
+    { type: "decimal", label: "Decimal", defaultLength: 10 },
+    { type: "enum", label: "Enum", defaultLength: null },
+    { type: "text", label: "Texto largo", defaultLength: null },
+    { type: "timestamp", label: "Fecha/Hora", defaultLength: null },
+    { type: "date", label: "Fecha", defaultLength: null },
+    { type: "datetime", label: "Fecha y hora", defaultLength: null },
+    { type: "json", label: "JSON", defaultLength: null },
+    { type: "uuid", label: "UUID", defaultLength: 36 }
+    ];
+
+    function renderTypeDatalist() {
+    const list = document.createElement("datalist");
+    list.id = "data-types";
+
+    typeDefaults.forEach(({ type }) => {
+        const option = document.createElement("option");
+        option.value = type;
+        list.appendChild(option);
+    });
+
+    document.body.appendChild(list);
+    }
+    renderTypeDatalist();
+    const inputTypeDefaults = [
+  "text", "number", "email", "password", "date", "datetime-local",
+  "checkbox", "radio", "file", "url", "tel", "textarea", "select"
+];
+
+        function saveForeignKey() {
+        const source_table = document.getElementById("fk-source-table").value.trim();
+        const source_field = document.getElementById("fk-source-field").value.trim();
+        const target_table = document.getElementById("fk-target-table").value.trim();
+        const target_field = document.getElementById("fk-target-field").value.trim();
+
+        if (!source_table || !source_field || !target_table || !target_field) {
+            alert("Todos los campos son obligatorios.");
+            return;
+        }
+
+        foreignKeysArray.push({
+            source_table,
+            source_field,
+            target_table,
+            target_field
+        });
+
+        document.getElementById("fk-form").style.display = "none";
+        }
+function addForeignKey() {
+  document.getElementById("fk-form").style.display = "block";
+}
+function renderForeignKeys() {
+  const container = document.getElementById("fk-list");
+  container.innerHTML = "<h4>Llaves foráneas</h4>";
+
+  foreignKeysArray.forEach((fk, index) => {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      ${fk.source_table}.${fk.source_field} ➜ ${fk.target_table}.${fk.target_field}
+      <button onclick="removeForeignKey(${index})">❌</button>
+    `;
+    container.appendChild(div);
+  });
+}
+function saveForeignKey() {
+  const source_table = document.getElementById("fk-source-table").value.trim();
+  const source_field = document.getElementById("fk-source-field").value.trim();
+  const target_table = document.getElementById("fk-target-table").value.trim();
+  const target_field = document.getElementById("fk-target-field").value.trim();
+
+  if (!source_table || !source_field || !target_table || !target_field) {
+    alert("Todos los campos son obligatorios.");
+    return;
+  }
+
+  foreignKeysArray.push({
+    source_table,
+    source_field,
+    target_table,
+    target_field
+  });
+
+  document.getElementById("fk-form").style.display = "none";
+
+  // Limpiar inputs
+  document.getElementById("fk-source-table").value = "";
+  document.getElementById("fk-source-field").value = "";
+  document.getElementById("fk-target-table").value = "";
+  document.getElementById("fk-target-field").value = "";
+
+  renderForeignKeys();
+}
+function removeForeignKey(index) {
+  foreignKeysArray.splice(index, 1);
+  renderForeignKeys();
+}
+function loadFile(event) {
+  const reader = new FileReader();
+  reader.onload = function() {
+    const json = JSON.parse(reader.result);
+    document.getElementById('modules').innerHTML = '';
+    json.modules.forEach(m => addModule(m.name, m.fields));
+
+    // Cargar llaves foráneas si existen
+    renderForeignKeys();
+  };
+  reader.readAsText(event.target.files[0]);
+}
+
+    </script>
+    <nav id="menubar">
+    <ul>
+        <li><button onclick="addModule()">➕ Nuevo módulo</button></li>
+        <li><button onclick="generate()">🧠 Generar JSON</button></li>
+        <li><button onclick="download()">💾 Descargar</button></li>
+        <li><button onclick="copyToClipboard()">📋 Copiar</button></li>
+        <li><button onclick="showHelp()">❓ Ayuda</button></li>
+        <li><input type="file" accept=".json" onchange="loadFile(event)" title="Cargar archivo JSON"></li>
+    </ul>
+    </nav>
+
+    <div id="sidebar" style="padding-top: 50px">
+    <!--Abrir
+      <input type="file" accept=".json" onchange="loadFile(event)" />
+      -->
+    <!--Diseñar-->
+    <h3>Campos</h3>
+    <div id="fields">
+        <div class="draggable" draggable="true"
+            data-type="bigint"
+            data-long="20"
+            data-input-type="number"
+            data-label="ID"
+            data-name="id"
+            data-pk="true"
+            data-ai="true"
+            data-required="false"
+            data-source="sidebar">ID</div>
+
+        <div class="draggable" draggable="true"
+            data-type="varchar"
+            data-long="255"
+            data-input-type="text"
+            data-label="Nombre"
+            data-name="name"
+            data-pk="false"
+            data-ai="false"
+            data-required="true"
+            data-source="sidebar">Name</div>
+
+        <div class="draggable" draggable="true"
+            data-type="date"
+            data-long=""
+            data-input-type="date"
+            data-label="Fecha"
+            data-name="date"
+            data-required="true"
+            data-source="sidebar">Date</div>
+
+        <div class="draggable" draggable="true"
+            data-type="date"
+            data-long=""
+            data-input-type="date"
+            data-label="Fecha inicio"
+            data-name="start_date"
+            data-required="true"
+            data-source="sidebar">Date Start</div>
+
+        <div class="draggable" draggable="true"
+            data-type="date"
+            data-long=""
+            data-input-type="date"
+            data-label="Fecha fin"
+            data-name="end_date"
+            data-required="true"
+            data-source="sidebar">Date End</div>
+
+        <div class="draggable" draggable="true"
+            data-type="enum"
+            data-long=""
+            data-input-type="text"
+            data-label="Estado"
+            data-name="status"
+            data-required="true"
+            data-source="sidebar">State</div>
+<div class="draggable" draggable="true" 
+            data-type="varchar" 
+            data-long="255" 
+            data-input-type="text"
+            data-label="Texto"
+            data-source="sidebar">Texto</div>
+
+        <div class="draggable" draggable="true" 
+            data-type="int" 
+            data-long="11" 
+            data-input-type="number"
+            data-label="Número"
+            data-source="sidebar">Número</div>
+
+        <div class="draggable" draggable="true" 
+            data-type="boolean" 
+            data-long=""
+            data-input-type="checkbox"
+            data-label="Booleano"
+            data-source="sidebar">Booleano</div>
+
+        <div class="draggable" draggable="true" 
+            data-type="timestamp" 
+            data-long=""
+            data-input-type="datetime-local"
+            data-label="Fecha/Hora"
+            data-source="sidebar">Fecha/Hora</div>
+    </div>
+     <!--
+    <div id="topbar">
+      <button onclick="addModule()">➕ Módulo</button>
+    </div>
+   
+    <button onclick="generate()">🧠 Generar JSON</button>
+    <button onclick="download()">💾 Descargar JSON</button>
+    <button onclick="copyToClipboard()">📋 Copiar JSON</button>
+    <button onclick="showHelp()">❓ Ayuda</button>
+    -->
+  </div>
+
+
+  <div id="workspace" style="padding-top: 50px">
+    <div id="modules" class="droppable" ondragover="event.preventDefault()" ondrop="onDrop(event)">
+      <!-- Módulos creados aparecerán aquí -->
+    </div>
+    <pre id="output">// Aquí aparecerá el JSON generado</pre>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal">
+    <div id="modal-content">
+      <h2>🧭 Cómo usar</h2>
+      <ul>
+        <li>Haz clic en "➕ Módulo" para agregar una tabla.</li>
+        <li>Arrastra campos desde la izquierda hacia el módulo.</li>
+        <li>Edita los nombres directamente haciendo clic.</li>
+        <li>Haz clic en "🧠 Generar JSON" para ver el resultado.</li>
+        <li>Opcional: guarda o carga desde un archivo JSON.</li>
+      </ul>
+      <h3>📌 Ejemplo generado</h3>
+      <code>
+{
+  "name": "users",
+  "db_table_name": "users",
+  "fields": [
+    { "db_field_name": "name", "db_data_type": "varchar" }
+  ]
+}
+      </code>
+      <button onclick="closeHelp()">Cerrar</button>
+    </div>
+  </div>
+
+  <script>    
+    let moduleCounter = 0;
+    function addCompositeIndex(button) {
+        const indexList = button.previousElementSibling;
+        const module = button.closest('.module');
+        const fields = Array.from(module.querySelectorAll('[data-role="name"]'))
+            .map(input => input.value.trim())
+            .filter(name => name);
+
+        if (fields.length === 0) {
+            alert("Agrega campos antes de definir índices.");
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.style.margin = '4px 0';
+        div.innerHTML = `
+            <input type="text" placeholder="Nombre índice" style="width: 100px;">
+            <select>
+            <option value="index">INDEX</option>
+            <option value="unique">UNIQUE</option>
+            </select>
+            <select multiple size="3" style="width: 120px;">
+            ${fields.map(f => `<option value="${f}">${f}</option>`).join('')}
+            </select>
+            <button onclick="this.parentElement.remove()">❌</button>
+        `;
+        indexList.appendChild(div);
+    }
+        function confirmDeleteModule(moduleElement) {
+        if (confirm("¿Seguro que quieres eliminar este módulo? Esta acción no se puede deshacer.")) {
+            moduleElement.remove();
+        }
+        }
+
+    function addInlineForeignKey(button) {
+        const fkList = button.previousElementSibling;
+        const module = button.closest('.module');
+        const fields = Array.from(module.querySelectorAll('[data-role="name"]')).map(f => f.value);
+
+        const div = document.createElement('div');
+        div.innerHTML = `
+            <select>${fields.map(f => `<option value="${f}">${f}</option>`).join('')}</select>
+            ➜
+            <input type="text" placeholder="tabla.objeto" style="width: 150px;">
+            <button onclick="this.parentElement.remove()">❌</button>
+        `;
+        fkList.appendChild(div);
+    }
+
+    function addModule(name = `Module${moduleCounter}`, fields = []) {
+        const container = document.createElement('div');
+        container.className = 'module';
+        container.dataset.module = name;
+        container.innerHTML = `
+            <h4 contenteditable="true">${name}</h4>
+            <button onclick="confirmDeleteModule(this.parentNode)">🗑 Eliminar módulo</button>
+            <div class="fields"></div>
+        `;
+
+        const fieldsContainer = container.querySelector('.fields');
+
+        const indexesContainer = document.createElement('div');
+        indexesContainer.className = 'indexes';
+        indexesContainer.innerHTML = `
+        <h5>Índices compuestos</h5>
+        <div class="index-list"></div>
+        <button onclick="addCompositeIndex(this)">➕ Índice compuesto</button>
+        `;
+        container.appendChild(indexesContainer);
+
+        const fksContainer = document.createElement('div');
+        fksContainer.className = 'foreign-keys';
+        fksContainer.innerHTML = `
+        <h5>Llaves foráneas</h5>
+        <div class="fk-list"></div>
+        <button onclick="addInlineForeignKey(this)">➕ Foreign Key</button>
+        `;
+        container.appendChild(fksContainer);
+
+        // Inicializar Sortable en el nuevo contenedor de campos
+        new Sortable(fieldsContainer, {
+            animation: 150,
+            ghostClass: 'sortable-ghost'
+        });
+
+        fields.forEach(f => {
+            const field = createFieldElement({
+            name: f.db_field_name,
+            type: f.db_data_type,
+            long: f.long ?? 255,
+            label: f.form_label || f.db_field_name,
+            required: f.required ?? true,
+            visible: f.form_visible_on_view ?? true,
+            pk: f.db_primary_key ?? false,
+            ai: f.db_auto_increment ?? false,
+            input_type: f.form_input_type
+            });
+            fieldsContainer.appendChild(field);
+        });
+
+        document.getElementById('modules').appendChild(container);
+        moduleCounter++;
+    }
+
+    function createFieldElement({ name = '', type = 'varchar',long = '', label = '', required = true, visible = true, pk = false,  ai = false } = {}, input_type='text') {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'field';
+    wrapper.style.marginBottom = '0.5rem';
+
+    const id = `f${Math.random().toString(36).substr(2, 5)}`;
+
+    wrapper.innerHTML = `
+        <input type="text" placeholder="Nombre campo" value="${name}" data-role="name" style="width: 100px;">
+        <input type="text" list="data-types" value="${type}" data-role="type" style="width: 120px;">
+        <input type="number" placeholder="Tamaño" value="${long}" data-role="long" style="width: 60px;" min="1">
+        <input type="text" placeholder="Label" value="${label}" data-role="label" style="width: 120px;">
+        <select data-role="input-type" style="width: 110px;">
+        ${inputTypeDefaults.map(type => 
+            `<option value="${type}" ${type === input_type ? 'selected' : ''}>${type}</option>`
+        ).join('')}
+        </select>
+        <label><input type="checkbox" data-role="pk" ${pk ? 'checked' : ''}> PK</label>
+        <label><input type="checkbox" data-role="ai" ${ai ? 'checked' : ''}> AI</label>
+        <label><input type="checkbox" data-role="req" ${required ? 'checked' : ''}> Requerido</label>
+        <label><input type="checkbox" data-role="vis" ${visible ? 'checked' : ''}> Visible</label>
+        <button onclick="this.parentElement.remove()">🗑</button>
+    `;
+
+    return wrapper;
+    }
+
+    function onDrop(event) {
+        const source = event.dataTransfer.getData('source');
+        const targetModule = event.target.closest('.module');
+        if (!targetModule) return;
+
+        if (source === 'sidebar') {
+            const fieldEl = createFieldElement({
+            name: event.dataTransfer.getData('name') || '',
+            type: event.dataTransfer.getData('type'),
+            long: event.dataTransfer.getData('long'),
+            label: event.dataTransfer.getData('label'),
+            required: event.dataTransfer.getData('required') === 'true',
+            pk: event.dataTransfer.getData('pk') === 'true',
+            ai: event.dataTransfer.getData('ai') === 'true',
+            input_type: event.dataTransfer.getData('input_type')
+            });
+
+            targetModule.querySelector('.fields').appendChild(fieldEl);
+
+            const input = fieldEl.querySelector('[data-role="name"]');
+            input.focus();
+        }
+    }
+
+
+
+
+
+    document.querySelectorAll('.draggable').forEach(el => {
+        el.addEventListener('dragstart', e => {
+            e.dataTransfer.setData('type', el.dataset.type);
+            e.dataTransfer.setData('long', el.dataset.long || '');
+            e.dataTransfer.setData('input_type', el.dataset.inputType || '');
+            e.dataTransfer.setData('label', el.dataset.label || '');
+            e.dataTransfer.setData('name', el.dataset.name || '');
+            e.dataTransfer.setData('pk', el.dataset.pk || 'false');
+            e.dataTransfer.setData('ai', el.dataset.ai || 'false');
+            e.dataTransfer.setData('required', el.dataset.required || 'true');
+            e.dataTransfer.setData('source', el.dataset.source || 'existing');
+        });
+    });
+
+
+    function generate() {
+    const modules = [];
+
+    // Recorre todos los módulos creados
+    document.querySelectorAll('.module').forEach(mod => {
+        const moduleName = mod.querySelector('h4').innerText.trim();
+        const fields = [];
+
+        // Campos
+        mod.querySelectorAll('.field').forEach((f, index) => {
+            const name = f.querySelector('[data-role="name"]').value.trim();
+            const dbType = f.querySelector('[data-role="type"]').value.trim();
+            const inputType = f.querySelector('[data-role="input-type"]')?.value.trim() || "";
+            const long = parseInt(f.querySelector('[data-role="long"]').value) || "";
+            const label = f.querySelector('[data-role="label"]').value.trim();
+            const pk = f.querySelector('[data-role="pk"]').checked;
+            const ai = f.querySelector('[data-role="ai"]').checked;
+            const required = f.querySelector('[data-role="req"]').checked;
+            const visible = f.querySelector('[data-role="vis"]').checked;
+
+            fields.push({
+                order: index,
+                db_field_name: name,
+                db_data_type: dbType,
+                db_primary_key: pk,
+                db_auto_increment: ai,
+                form_label: label,
+                form_input_type: inputType,
+                required: required,
+                form_visible_on_view: visible,
+                long: long
+            });
+        });
+
+        // Índices compuestos
+        const indexes = [];
+        mod.querySelectorAll('.index-list > div').forEach(div => {
+            const name = div.querySelector('input').value.trim();
+            const type = div.querySelector('select').value;
+            const selected = Array.from(div.querySelectorAll('select')[1].selectedOptions)
+                .map(opt => opt.value);
+
+            if (name && selected.length > 0) {
+                indexes.push({ name, type, fields: selected });
+            }
+        });
+
+        // Llaves foráneas (dentro del módulo)
+        const foreign_keys = [];
+        mod.querySelectorAll('.fk-list > div').forEach(div => {
+            const localField = div.querySelector('select').value;
+            const [target_table, target_field] = div.querySelector('input').value.split(".");
+            if (localField && target_table && target_field) {
+                foreign_keys.push({
+                    source_table: moduleName.toLowerCase(),
+                    source_field: localField,
+                    target_table: target_table.trim(),
+                    target_field: target_field.trim()
+                });
+            }
+        });
+
+        // Agregar módulo al array
+        modules.push({
+            name: moduleName,
+            db_table_name: moduleName.toLowerCase(),
+            fields,
+            indexes,
+            foreign_keys
+        });
+    });
+
+    // JSON final
+    const result = { modules };
+    const output = JSON.stringify(result, null, 2);
+    document.getElementById('output').textContent = output;
+    return output;
+}
+
+
+
+    function download() {
+      const content = generate();
+      const blob = new Blob([content], {type: "application/json"});
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "blm_schema.json";
+      link.click();
+    }
+    function copyToClipboard() {
+    const output = document.getElementById("output").textContent;
+    if (!output.trim()) {
+        alert("No hay JSON generado aún.");
+        return;
+    }
+
+    navigator.clipboard.writeText(output)
+        .then(() => {
+        alert("JSON copiado al portapapeles ✅");
+        })
+        .catch(err => {
+        console.error("Error al copiar:", err);
+        alert("Error al copiar el JSON ❌");
+        });
+    }
+
+    function loadFile(event) {
+      const reader = new FileReader();
+      reader.onload = function() {
+        const json = JSON.parse(reader.result);
+        document.getElementById('modules').innerHTML = '';
+        json.modules.forEach(m => addModule(m.name, m.fields));
+      };
+      reader.readAsText(event.target.files[0]);
+    }
+
+    function showHelp() {
+      document.getElementById('modal').style.display = 'flex';
+    }
+
+    function closeHelp() {
+      document.getElementById('modal').style.display = 'none';
+    }
+    
+  </script>
+  <script>
+    document.querySelectorAll('.fields').forEach(container => {
+    new Sortable(container, {
+        animation: 150,
+        ghostClass: 'sortable-ghost'
+    });
+    });
+  </script>
+    
+</body>
+</html>
